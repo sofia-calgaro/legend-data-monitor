@@ -149,7 +149,7 @@ def geds_map(
     x_axis_labels = [f"S{no}" for no in string_name]
     y_axis_labels = ["" for idx in range(0, len(df))]
 
-    fig = plt.figure(num=None, figsize=(8, 12), dpi=80, facecolor="w", edgecolor="k")
+    fig = plt.figure(num=None, figsize=(20, 15), dpi=150, facecolor="w", edgecolor="k")
     sns.set(font_scale=1.2)
 
     custom_cmap = ["#318CE7", "#CC0000", "#F7AB60", "#D0D0D0", "#FFFFFF"]
@@ -163,15 +163,15 @@ def geds_map(
         fmt="s",
         cmap=custom_cmap,
         cbar=True,
-        linewidths=1,
+        linewidths=3,
         linecolor="white",
         square=True,
         rasterized=True,
     )
 
     colorbar = status_map.collections[0].colorbar
-    colorbar.set_ticks([1 / 2, 3 / 2, 5 / 2, 7 / 2, 0])
-    colorbar.set_ticklabels(["OK", "X", "AC", "OFF", ""])
+    colorbar.set_ticks([1 / 2, 3 / 2, 5 / 2, 7 / 2])
+    colorbar.set_ticklabels(["OK", "X", "AC", "OFF"])
 
     plt.tick_params(
         axis="both",
@@ -182,7 +182,7 @@ def geds_map(
         top=False,
         labeltop=True,
     )
-    plt.title(f"geds ({parameter})")
+    plt.title(f"geds ({parameter})", fontsize=20)
 
     pkl_name = analysis.set_pkl_name(
         exp,

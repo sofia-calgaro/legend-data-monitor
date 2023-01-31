@@ -9,9 +9,10 @@ import pygama.lgdo.lh5_store as lh5
 from . import analysis
 
 j_config, j_par, _ = analysis.read_json_files()
+exp = j_config[0]["exp"]
 version = j_config[0]["path"]["version"]
-keep_puls_pars = j_config[6]["pulser"]["keep_puls_pars"]
-keep_phys_pars = j_config[6]["pulser"]["keep_phys_pars"]
+pulser_events = j_config[6]["pulser"]["pulser_events"]
+physics_events = j_config[6]["pulser"]["physics_events"]
 no_variation_pars = j_config[6]["plot_values"]["no_variation_pars"]
 qc_flag = j_config[6]["quality_cuts"]
 qc_version = j_config[6]["quality_cuts"]["version"]["QualityCuts_flag"][
@@ -29,6 +30,7 @@ def load_parameter(
     all_ievt: np.ndarray,
     puls_only_ievt: np.ndarray,
     not_puls_ievt: np.ndarray,
+    pulser_timestamps: np.ndarry,
     start_code: str,
 ):
     """
@@ -49,9 +51,11 @@ def load_parameter(
     all_ievt
                     Event number for all events
     puls_only_ievt
-                    Event number for high energy pulser events
+                    Event number for pulser events
     not_puls_ievt
                     Event number for physical events
+    pulser_timestamps
+                    Timestamps of pulser events
     start_code
                     Starting time of the code
     """
@@ -65,19 +69,22 @@ def load_parameter(
     else:
         utime_array = data["timestamp"]
 
-    if all_ievt != [] and puls_only_ievt != [] and not_puls_ievt != []:
-        det_only_index = np.isin(all_ievt, not_puls_ievt)
-        puls_only_index = np.isin(all_ievt, puls_only_ievt)
-        if parameter in keep_puls_pars:
-            utime_array = utime_array[puls_only_index]
-        if parameter in keep_phys_pars:
-            utime_array = utime_array[det_only_index]
+    if exp == "l60":
+        # select (or remove) pulser events from timestamps array
+        if all_ievt != [] and puls_only_ievt != [] and not_puls_ievt != []:
+            det_only_index = np.isin(all_ievt, not_puls_ievt)
+            puls_only_index = np.isin(all_ievt, puls_only_ievt)
+            if parameter in pulser_events:
+                utime_array = utime_array[puls_only_index]
+            if parameter in physics_events:
+                utime_array = utime_array[det_only_index]
+
 
     # apply quality cuts to the time array
     if qc_flag[det_type] is True:
-        if parameter in keep_puls_pars:
+        if parameter in pulser_events:
             keep_evt_index = puls_only_index
-        elif parameter in keep_phys_pars:
+        elif parameter in physics_events:
             keep_evt_index = det_only_index
         else:
             keep_evt_index = []
@@ -85,8 +92,7 @@ def load_parameter(
         utime_array = utime_array[quality_index]
 
     # cutting time array according to time selection
-    utime_array_cut, _ = analysis.time_analysis(utime_array, [], time_cut, start_code)
-
+    utime_array_cut = utime_array
     # to handle particular cases where the timestamp array is outside the time window:
     if len(utime_array_cut) == 0:
         return [], [], []
@@ -133,23 +139,20 @@ def load_parameter(
     else:
         par_array = data[parameter]
 
-    if all_ievt != [] and puls_only_ievt != [] and not_puls_ievt != []:
-        if parameter in keep_puls_pars:
-            if parameter not in no_cut_pars:
-                par_array = par_array[puls_only_index]
-        if parameter in keep_phys_pars:
-            if parameter not in no_cut_pars:
-                par_array = par_array[det_only_index]
+    # select (or remove) pulser events from parameter array
+    if exp == "l60":
+        if all_ievt != [] and puls_only_ievt != [] and not_puls_ievt != []:
+            if parameter in pulser_events:
+                if parameter not in no_cut_pars:
+                    par_array = par_array[puls_only_index]
+            if parameter in physics_events:
+                if parameter not in no_cut_pars:
+                    par_array = par_array[det_only_index]
+
 
     # apply quality cuts to the parameter array
     if qc_flag[det_type] is True and parameter not in no_cut_pars:
         par_array = par_array[quality_index]
-
-    # cutting parameter array according to time selection
-    if parameter not in no_cut_pars:
-        _, par_array = analysis.time_analysis(
-            utime_array, par_array, time_cut, start_code
-        )
 
     if parameter in ["energy_in_pe", "trigger_pos"] and det_type == "spms":
         a = utime_array_cut
@@ -170,7 +173,11 @@ def load_parameter(
         utime_array_cut = utime_array_cut.to_numpy()
 
     # Enable following lines to get the % variation of a parameter wrt to its mean value
-    if parameter not in no_variation_pars and det_type not in ["spms", "ch000"]:
+    if parameter not in no_variation_pars and det_type not in [
+        "spms",
+        "ch000",
+        "ch001",
+    ]:
         # par_array_mean = np.mean(par_array[: int(0.05 * len(par_array))])
         par_array_mean = analysis.get_mean(
             par_array, utime_array_cut, parameter, detector
@@ -247,10 +254,10 @@ def event_rate(
         if all_ievt != [] and puls_only_ievt != [] and not_puls_ievt != []:
             det_only_index = np.isin(all_ievt, not_puls_ievt)
             puls_only_index = np.isin(all_ievt, puls_only_ievt)
-            if "event_rate" in keep_puls_pars:
+            if "event_rate" in pulser_events:
                 energies = energies[puls_only_index]
                 no_hits = no_hits[puls_only_index]
-            if "event_rate" in keep_phys_pars:
+            if "event_rate" in physics_events:
                 energies = energies[det_only_index]
                 no_hits = no_hits[det_only_index]
         if len(energies) == 0:
@@ -258,9 +265,9 @@ def event_rate(
 
         # apply quality cuts
         if qc_flag[det_type] is True:
-            if "event_rate" in keep_puls_pars:
+            if "event_rate" in pulser_events:
                 keep_evt_index = puls_only_index
-            elif "event_rate" in keep_phys_pars:
+            elif "event_rate" in physics_events:
                 keep_evt_index = det_only_index
             else:
                 keep_evt_index = []
