@@ -141,6 +141,7 @@ def select_and_plot_run(
     # get pulser-events indices (will be put here in common for geds&spms once DataLoader works for spms too)
     all_ievt, puls_only_ievt, not_puls_ievt = analysis.get_puls_ievt(query)
     """
+    # all_ievt, puls_only_ievt, not_puls_ievt = analysis.get_puls_ievt(query)
 
     with PdfPages(path) as pdf:
         with PdfPages(map_path) as pdf_map:
@@ -148,16 +149,28 @@ def select_and_plot_run(
                 det_type["geds"] is False
                 and det_type["spms"] is False
                 and det_type["ch000"] is False
+                and det_type["ch001"] is False
             ):
                 logging.error(
                     "NO detectors have been selected! Enable geds and/or spms and/or ch000 in config.json"
                 )
                 return
 
+            if exp == "l60":
+                    # get pulser-events indices (L60)
+                    all_ievt, puls_only_ievt, not_puls_ievt = analysis.get_puls_ievt(
+                        query
+                    )
+                    pulser_timestamps = []
+            elif exp == "l200":
+                # get pulser-events indices (L200)
+                pulser_timestamps = analysis.get_pulser_timestamps(query)
+                all_ievt = []
+                puls_only_ievt = []
+                not_puls_ievt = []
+
             # geds plots
             if det_type["geds"] is True:
-                # get pulser-events indices
-                all_ievt, puls_only_ievt, not_puls_ievt = analysis.get_puls_ievt(query)
 
                 string_geds, string_geds_name = analysis.read_geds(geds_dict)
                 geds_par = par_to_plot["geds"]
@@ -241,6 +254,7 @@ def select_and_plot_run(
                                             all_ievt,
                                             puls_only_ievt,
                                             not_puls_ievt,
+                                            pulser_timestamps,
                                             start_code,
                                             time_range,
                                             pdf,
@@ -320,6 +334,7 @@ def select_and_plot_run(
                                         all_ievt,
                                         puls_only_ievt,
                                         not_puls_ievt,
+                                        pulser_timestamps,
                                         start_code,
                                         time_range,
                                         pdf,
@@ -463,12 +478,12 @@ def select_and_plot_run(
                 else:
                     db_parameters = analysis.load_df_cols(ch000_par, "ch000")
                     dbconfig_filename, dlconfig_filename = analysis.write_config(
-                        files_path, version, [["ch00"]], db_parameters, "ch000"
+                        files_path, version, [["ch000"]], db_parameters, "ch000"
                     )
                     data = analysis.read_from_dataloader(
                         dbconfig_filename, dlconfig_filename, query, db_parameters
                     )
-
+                    print(data)
                     logging.error("ch000 will be plotted...")
                     if "timestamp" in ch000_par:
                         ch000_par.remove("timestamp")
@@ -478,9 +493,6 @@ def select_and_plot_run(
                             par,
                             time_cut,
                             "ch000",
-                            all_ievt,
-                            puls_only_ievt,
-                            not_puls_ievt,
                             start_code,
                             time_range,
                             pdf,
@@ -491,8 +503,47 @@ def select_and_plot_run(
                             else:
                                 logging.error(f"\t...no {par} plots for ch000!")
 
+            # ch001 plots
+            if det_type["ch001"] is True:
+                ch001_par = par_to_plot["ch001"]
+                if len(ch001_par) == 0:
+                    logging.error("ch001: NO parameters have been enabled!")
+                else:
+                    db_parameters = analysis.load_df_cols(ch001_par, "ch001")
+                    dbconfig_filename, dlconfig_filename = analysis.write_config(
+                        files_path, version, [["ch001"]], db_parameters, "ch001"
+                    )
+                    data = analysis.read_from_dataloader(
+                        dbconfig_filename, dlconfig_filename, query, db_parameters
+                    )
+
+                    print(data)
+                    logging.error("ch001 will be plotted...")
+                    if "timestamp" in ch001_par:
+                        ch001_par.remove("timestamp")
+                    for par in ch001_par:
+                        map_dict = plot.plot_par_vs_time_ch001(
+                            data,
+                            par,
+                            time_cut,
+                            "ch001",
+                            start_code,
+                            pulser_timestamps,
+                            time_range,
+                            pdf,
+                        )
+                        if verbose is True:
+                            if map_dict is not None:
+                                logging.error(f"\t...{par} for ch001 has been plotted!")
+                            else:
+                                logging.error(f"\t...no {par} plots for ch001!")
+
     # defining json file name (not for spms; there, we do not have parameters for which we evaluate averages)
-    if det_type["geds"] is True or det_type["ch000"] is True:
+    if (
+        det_type["geds"] is True
+        or det_type["ch000"] is True
+        or det_type["ch001"] is True
+    ):
         jsonfile_name = (
             f"{exp}-{period}-{datatype}-{time_range[0]}_{time_range[1]}.json"
         )

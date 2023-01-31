@@ -10,9 +10,13 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sn
 from matplotlib import dates, ticker
 
 from . import analysis, parameters
+
+palette = sn.color_palette("hls", 15)
+# sn.set_theme(style='darkgrid')
 
 plt.rcParams.update({"figure.max_open_warning": 0})
 plt.rcParams["figure.figsize"] = (14, 10)
@@ -32,6 +36,8 @@ run = j_config[2]
 filelist = j_config[3]
 datatype = j_config[4]
 no_variation_pars = j_config[6]["plot_values"]["no_variation_pars"]
+pulser_events = j_config[6]["pulser"]["pulser_events"]
+physics_events = j_config[6]["pulser"]["physics_events"]
 plot_style = j_config[7]
 qc_flag = j_config[6]["quality_cuts"]
 verbose = j_config[12]
@@ -68,6 +74,7 @@ def plot_parameters(
         plot_style["par_average"] is True
         and parameter != "K_lines"
         and det_type != "ch000"
+        and det_type != "ch001"
     ):
         par_array, utime_array = analysis.avg_over_entries(par_array, utime_array)
 
@@ -83,11 +90,13 @@ def plot_parameters(
         col = j_plot[1][detector]
     if det_type == "ch000":
         col = "k"
+    if det_type == "ch001":
+        col = "k"
 
     # if we want to plot detectors that are only problematic
     status_flag = j_config[10][det_type]
     if status_flag is True and status == 1:
-        if det_type == "ch000" or parameter == "K_lines":
+        if det_type == "ch000" or det_type == "ch001" or parameter == "K_lines":
             ax.plot(times, par_array, color=col, linewidth=0, marker=".", markersize=10)
             plt.plot(
                 times, par_array, color=col, linewidth=0, marker=".", markersize=10
@@ -97,7 +106,82 @@ def plot_parameters(
             plt.plot(times, par_array, color=col, linewidth=1)
     # plot everything independently of the detector's status
     else:
-        if det_type == "ch000" or parameter == "K_lines":
+        if det_type == "ch000" or det_type == "ch001" or parameter == "K_lines":
+            ax.plot(times, par_array, color=col, linewidth=0, marker=".", markersize=10)
+            plt.plot(
+                times, par_array, color=col, linewidth=0, marker=".", markersize=10
+            )
+        else:
+            ax.plot(times, par_array, color=col, linewidth=2)
+            plt.plot(times, par_array, color=col, linewidth=2)
+
+    return times[0], times[-1], status, ax
+
+
+def plot_parameters_200(
+    ax,
+    par_array: np.ndarray,
+    utime_array: np.ndarray,
+    detector: str,
+    det_type: str,
+    parameter: str,
+):
+    """
+    Plot the parameter VS time and check if parameters are below/above some given thresholds.
+
+    Parameters
+    ----------
+    ax
+                  Plot to be saved in pkl file
+    par_array
+                  Array with parameter values
+    utime_array
+                  Array with (shifted+cut) time values
+    detector
+                  Name of the detector
+    det_type
+                  Type of detector (geds or spms)
+    parameter
+                  Parameter to plot
+    """
+    # rebinning
+    if (
+        plot_style["par_average"] is True
+        and parameter != "K_lines"
+        and det_type != "ch000"
+        and det_type != "ch001"
+    ):
+        par_array, utime_array = analysis.avg_over_entries(par_array, utime_array)
+
+    # function to check if par values are outside some pre-defined limits
+    status = analysis.check_par_values(
+        utime_array, par_array, parameter, detector, det_type
+    )
+    times = [datetime.fromtimestamp(t) for t in utime_array]
+
+    if det_type == "spms":
+        col = j_plot[0][str(detector)]
+    if det_type == "geds":
+        col = j_plot[1][detector]
+    if det_type == "ch000":
+        col = "k"
+    if det_type == "ch001":
+        col = "k"
+
+    # if we want to plot detectors that are only problematic
+    status_flag = j_config[10][det_type]
+    if status_flag is True and status == 1:
+        if det_type == "ch000" or det_type == "ch001" or parameter == "K_lines":
+            ax.plot(times, par_array, color=col, linewidth=0, marker=".", markersize=10)
+            plt.plot(
+                times, par_array, color=col, linewidth=0, marker=".", markersize=10
+            )
+        else:
+            ax.plot(times, par_array, color=col, linewidth=1)
+            plt.plot(times, par_array, color=col, linewidth=1)
+    # plot everything independently of the detector's status
+    else:
+        if det_type == "ch000" or det_type == "ch001" or parameter == "K_lines":
             ax.plot(times, par_array, color=col, linewidth=0, marker=".", markersize=10)
             plt.plot(
                 times, par_array, color=col, linewidth=0, marker=".", markersize=10
@@ -331,14 +415,164 @@ def plot_par_vs_time(
     return string_mean_dict, map_dict
 
 
+def plot_par_vs_time_ch001(
+    data: pd.DataFrame,
+    parameter: str,
+    time_cut: list[str],
+    det_type: str,
+    start_code: str,
+    pulser_timestamps: np.ndarray,
+    time_range: list[str],
+    pdf=None,
+) -> dict:
+    """
+    Plot time evolution of given parameter for ch000.
+
+    Parameters
+    ----------
+    data
+                    Pandas dataframes containing dsp/hit data
+    parameter
+                    Parameter to plot
+    time_cut
+                    List with info about time cuts
+    det_type
+                    Type of detector (ch001)
+    start_code
+                    Starting time of the code
+    time_range
+                    First and last timestamps of the time range of interest
+    """
+    fig, ax = plt.subplots(1, 1)
+    ax.set_facecolor("w")
+    ax.grid(axis="both", which="major")
+    plt.grid(axis="both", which="major")
+    start_times = []
+    end_times = []
+    map_dict = {}
+
+    # keep entries for the selected detector (note: no hit table for ch000)
+    # new_data = data[data["dsp_table"] == 0] # what is this line for?
+    new_data = data
+
+    all_ievt = []
+    puls_only_ievt = []
+    not_puls_ievt = []
+
+    # det parameter and time arrays for a given detector
+    _, par_array, utime_array = parameters.load_parameter(
+        new_data,
+        parameter,
+        "ch001",
+        det_type,
+        time_cut,
+        all_ievt,
+        puls_only_ievt,
+        not_puls_ievt,
+        pulser_timestamps,
+        start_code,
+    )
+
+    # plot detector and get its status
+    start_time, end_time, status, ax = plot_parameters(
+        ax, par_array, utime_array, "ch001", det_type, parameter
+    )
+
+    # fill the map with status flags
+    if "ch001" not in map_dict:
+        map_dict["ch001"] = status
+    else:
+        if map_dict["ch001"] == 0:
+            map_dict["ch001"] = status
+
+    start_times.append(start_time)
+    end_times.append(end_time)
+
+    # no data were found at all
+    if len(start_times) == 0 and len(end_times) == 0:
+        return None, None
+
+    # 1D-plot
+    locs = np.linspace(
+        dates.date2num(start_times[0]), dates.date2num(end_times[-1]), 10
+    )
+    xlab = "%d/%m"
+    if j_config[11]["frmt"] == "day/month-time":
+        xlab = "%d/%m\n%H:%M"
+    if j_config[11]["frmt"] == "time":
+        xlab = "%H:%M"
+    labels = [dates.num2date(loc).strftime(xlab) for loc in locs]
+    ax.set_xticks(locs)
+    ax.set_xticklabels(labels)
+    plt.xticks(locs, labels)
+    ax.legend(
+        loc=(1.04, 0.0),
+        ncol=1,
+        frameon=True,
+        facecolor="white",
+        framealpha=0,
+    )
+    plt.legend(
+        loc=(1.04, 0.0),
+        ncol=1,
+        frameon=True,
+        facecolor="white",
+        framealpha=0,
+    )
+    xlab = j_config[11]["frmt"]
+    ylab = j_par[0][parameter]["label"]
+    if parameter in no_variation_pars:
+        if j_par[0][parameter]["units"] != "null":
+            ylab += " [" + j_par[0][parameter]["units"] + "]"
+        if parameter == "event_rate":
+            units = j_config[6]["par-info"]["event_rate"]["units"]
+            ylab += " [" + units + "]"
+    else:
+        ylab += ", %"
+    ax.set_ylabel(ylab)
+    ax.set_xlabel(f"{xlab} (UTC)")
+    plt.ylabel(ylab)
+    plt.xlabel(f"{xlab} (UTC)")
+
+    # set title
+    ax.set_title("ch001")
+    plt.title("ch001")
+
+    # set y-label
+    low_lim = j_par[0][parameter]["limit"][det_type][0]
+    upp_lim = j_par[0][parameter]["limit"][det_type][1]
+    if low_lim != "null":
+        ax.axhline(y=low_lim, color="r", linestyle="--", linewidth=2)
+        plt.axhline(y=low_lim, color="r", linestyle="--", linewidth=2)
+    if upp_lim != "null":
+        ax.axhline(y=upp_lim, color="r", linestyle="--", linewidth=2)
+        plt.axhline(y=upp_lim, color="r", linestyle="--", linewidth=2)
+
+    # define name of pkl file (with info about time cut if present)
+    pkl_name = analysis.set_pkl_name(
+        exp,
+        period,
+        datatype,
+        det_type,
+        "",
+        parameter,
+        time_range,
+    )
+
+    pkl.dump(ax, open(f"{output}/pkl-files/par-vs-time/{pkl_name}", "wb"))
+    pdf.savefig(bbox_inches="tight")
+    plt.close()
+
+    logging.info(f"{parameter} is plotted from {start_times[0]} to {end_times[-1]}")
+
+    return map_dict
+
+
 def plot_par_vs_time_ch000(
     data: pd.DataFrame,
     parameter: str,
     time_cut: list[str],
     det_type: str,
-    all_ievt: np.ndarray,
-    puls_only_ievt: np.ndarray,
-    not_puls_ievt: np.ndarray,
     start_code: str,
     time_range: list[str],
     pdf=None,
@@ -377,7 +611,12 @@ def plot_par_vs_time_ch000(
     map_dict = {}
 
     # keep entries for the selected detector (note: no hit table for ch000)
-    new_data = data[data["dsp_table"] == 0]
+    # new_data = data[data["dsp_table"] == 0]
+
+    new_data = data
+    all_ievt = []
+    puls_only_ievt = []
+    not_puls_ievt = []
 
     # det parameter and time arrays for a given detector
     _, par_array, utime_array = parameters.load_parameter(
@@ -530,6 +769,8 @@ def plot_par_vs_time_2d(
                 Event number for high energy pulser events
     not_puls_ievt
                 Event number for physical events
+    pulser_timestamps
+                    Timestamps of pulser events
     start_code
                 Starting time of the code
     time_range
@@ -547,7 +788,6 @@ def plot_par_vs_time_2d(
         columns = 3
         rows = 3
     fig, ax_array = plt.subplots(rows, columns, squeeze=False, sharex=True, sharey=True)
-    # fig.patch.set_facecolor(j_par[0][parameter]["facecol"])
     fig.suptitle(f"{det_type} - {string_number}", fontsize=12)
     ylab = j_par[0][parameter]["label"]
     if parameter in no_variation_pars:
@@ -600,6 +840,7 @@ def plot_par_vs_time_2d(
                 all_ievt,
                 puls_only_ievt,
                 not_puls_ievt,
+                pulser_timestamps,
                 start_code,
             )
             if len(par_array) == 0:
@@ -672,9 +913,6 @@ def plot_par_vs_time_2d(
     [ax.set_xticks(locs) for axs in ax_array for ax in axs]
     [ax.set_xticklabels(labels) for axs in ax_array for ax in axs]
     plt.xticks(locs, labels)
-
-    # start_name = start_times[0].astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    # end_name = end_times[-1].astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
     # define name of pkl file (with info about time cut if present)
     pkl_name = analysis.set_pkl_name(
@@ -867,10 +1105,6 @@ def plot_wtrfll(
     fig.subplots_adjust(left=-0.21)  # to move the plot towards the left
 
     # define name of pkl file (with info about time cut if present)
-    # start_name = start_times[0].astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    # end_name = end_times[-1].astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-
-    # define name of pkl file (with info about time cut if present)
     pkl_name = analysis.set_pkl_name(
         exp,
         period,
@@ -899,6 +1133,7 @@ def plot_ch_par_vs_time(
     all_ievt: np.ndarray,
     puls_only_ievt: np.ndarray,
     not_puls_ievt: np.ndarray,
+    pulser_timestamps: np.ndarray,
     start_code: str,
     time_range: list[str],
     pdf=None,
@@ -924,9 +1159,11 @@ def plot_ch_par_vs_time(
     all_ievt
                     Event number for all events
     puls_only_ievt
-                    Event number for high energy pulser events
+                    Event number for pulser events
     not_puls_ievt
                     Event number for physical events
+    pulser_timestamps
+                    Timestamps of pulser events
     start_code
                     Starting time of the code
     time_range
@@ -971,7 +1208,7 @@ def plot_ch_par_vs_time(
             ):  # remove the following block when DataLoader is working for spms
                 new_data = data
             else:
-                new_data = data[data["hit_table"] == int(detector.split("ch0")[-1])]
+                new_data = data[data["hit_table"] == int(detector.split("ch")[-1])]
 
             # skip missing detector
             if (
@@ -992,13 +1229,34 @@ def plot_ch_par_vs_time(
                 string_no = det_dict[detector]["string"]["number"]
                 string_pos = det_dict[detector]["string"]["position"]
                 lbl = f"{name}\ns{string_no}-p{string_pos}-{detector}"
+                col = palette[int(string_pos)]
             else:
                 name = det_dict[detector]["det_id"]
                 lbl = f"{name} - {detector}"
             if det_type == "spms":
                 col = j_plot[0][str(detector)]
-            if det_type == "geds":
-                col = j_plot[1][detector]
+
+            if len(time_cut) == 4:
+                start_time = time_cut[0] + " " + time_cut[1]
+                end_time = time_cut[2] + " " + time_cut[3]
+
+                start_timestamp = (
+                    datetime.strptime(start_time, "%d/%m/%Y %H:%M:%S")
+                ).timestamp()
+                end_timestamp = (
+                    datetime.strptime(end_time, "%d/%m/%Y %H:%M:%S")
+                ).timestamp()
+
+                new_data = new_data[new_data["timestamp"] > start_timestamp]
+                new_data = new_data[new_data["timestamp"] < end_timestamp]
+
+            if exp == "l200":
+                # select (or remove) pulser events from timestamps array
+                if parameter in pulser_events:
+                    new_data = new_data[new_data["timestamp"].isin(pulser_timestamps)]
+                elif parameter in physics_events:
+                    new_data = new_data[~new_data["timestamp"].isin(pulser_timestamps)]
+
 
             # det parameter and time arrays for a given detector
             par_array_mean, par_array, utime_array = parameters.load_parameter(
@@ -1010,6 +1268,7 @@ def plot_ch_par_vs_time(
                 all_ievt,
                 puls_only_ievt,
                 not_puls_ievt,
+                pulser_timestamps,
                 start_code,
             )
             if len(par_array) == 0:
@@ -1025,12 +1284,14 @@ def plot_ch_par_vs_time(
             start_time = times[0]
             end_time = times[-1]
 
-            if det_type == "spms":
-                col = j_plot[0][str(detector)]
-            if det_type == "geds":
-                col = j_plot[1][detector]
-            if det_type == "ch000":
-                col = "r"
+            # if det_type == "spms":
+            #     col = j_plot[0][str(detector)]
+            # if det_type == "geds":
+            #     col = j_plot[1][detector]
+            # if det_type == "ch000":
+            #     col = "r"
+            # if det_type == "ch001":
+            #     col = "r"
 
             # legend
             if parameter not in no_variation_pars:
@@ -1110,6 +1371,23 @@ def plot_ch_par_vs_time(
     [ax.set_xticks(locs) for axs in ax_array for ax in axs]
     [ax.set_xticklabels(labels) for axs in ax_array for ax in axs]
     plt.xticks(locs, labels)
+
+    low_lim = []
+    high_lim = []
+
+    # might these values become a standard for geds in future?
+    if parameter == "baseline":
+        low_lim = -5
+        high_lim = 5
+    elif parameter == "bl_std":
+        low_lim = -25
+        high_lim = 25
+    elif parameter == "uncal_puls":
+        low_lim = -0.8
+        high_lim = 0.8
+
+    # plt.ylim([low_lim, high_lim])
+    # [ax.set_ylim([low_lim, high_lim]) for axs in ax_array for ax in axs]
 
     # no data were found at all
     if len(start_times) == 0 and len(end_times) == 0:

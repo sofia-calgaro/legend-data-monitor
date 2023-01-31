@@ -65,9 +65,8 @@ period = j_config[1]
 run = j_config[2]
 file_keys = j_config[3]
 datatype = j_config[4]
-keep_puls_pars = j_config[6]["pulser"]["keep_puls_pars"]
-keep_phys_pars = j_config[6]["pulser"]["keep_phys_pars"]
-keep_phys_pars = j_config[6]["pulser"]["keep_phys_pars"]
+pulser_events = j_config[6]["pulser"]["pulser_events"]
+physics_events = j_config[6]["pulser"]["physics_events"]
 qc_flag = j_config[6]["quality_cuts"]
 qc_version = j_config[6]["quality_cuts"]["version"]["QualityCuts_flag"][
     "apply_to_version"
@@ -101,8 +100,24 @@ def write_config(
     det_type
                 Type of detector (geds, spms or ch000)
     """
-    if "0" in det_type:
-        if det_type == "ch00":
+    if det_type == "ch001":
+        if det_type == "ch001":
+            det_type = "evts"
+        det_list = [1]
+        dict_dbconfig = {
+            "data_dir": files_path + version + "/generated/tier",
+            "tier_dirs": {"dsp": "/dsp"},
+            "file_format": {
+                "dsp": "/phy/{period}/{run}/{exp}-{period}-{run}-phy-{timestamp}-tier_dsp.lh5"
+            },
+            "table_format": {"dsp": "ch{ch:03d}/dsp"},
+            "tables": {"dsp": det_list},
+            "columns": {"dsp": parameters},
+        }
+        dict_dlconfig = {"levels": {"dsp": {"tiers": ["dsp"]}}, "channel_map": {}}
+
+    if det_type == "ch000":
+        if det_type == "ch000":
             det_type = "evts"
         det_list = [0]
         dict_dbconfig = {
@@ -116,7 +131,7 @@ def write_config(
             "columns": {"dsp": parameters},
         }
         dict_dlconfig = {"levels": {"dsp": {"tiers": ["dsp"]}}, "channel_map": {}}
-    else:
+    if det_type == "geds" or det_type == "spms":
         # flattening list[list[str]] to list[str]
         flat_list = [ch for det in det_map for ch in det]
 
@@ -339,7 +354,8 @@ def load_df_cols(par_to_plot: list[str], det_type: str):
 
 def load_geds():
     """Load channel map for geds."""
-    json_file = f"{exp.upper()}-{period}-r%-T%-all-config"
+    # json_file = f"{exp.upper()}-{period}-r%-T%-all-config"
+    json_file = "L200-p01-r%-T%-all-config"
     map_lmeta = lmeta["hardware"]["configuration"]["channelmaps"]
     channel_map = map_lmeta[json_file]
 
@@ -415,50 +431,50 @@ def load_spms():
 
     if exp == "l200":
         # we keep using L60 map because L200 map has no info about spms positions
-        map_file = map_path + f"L60-{period}-r%-T%-SiPM-config.json"
+        # map_file = map_path + f"L60-{period}-r%-T%-SiPM-config.json"
+        map_file = map_path + "L60-p01-r%-T%-SiPM-config.json"
         with open(map_file) as f:
             spms_dict = json.load(f)
 
-        """
-        # a future possible dictionary for L200
-        json_file = f"{exp.upper()}-{period}-r%-T%-all-config"
-        map_lmeta = lmeta["hardware"]["configuration"]["channelmaps"]
-        channel_map = map_lmeta[json_file]
 
-        spms_dict = {}
-        for k1,v1 in channel_map.items():
-            if 'S0' in k1: # keep only spms
-                info_dict = {}
-                info_dict["system"] = "spm"
-                info_dict["det_id"] = v1["detname"]
-                info_dict["barrel"] = str(v1["location"]["fiber"])[2:]
+        # # a future possible dictionary for L200
+        # json_file = f"{exp.upper()}-{period}-r%-T%-all-config"
+        # map_lmeta = lmeta["hardware"]["configuration"]["channelmaps"]
+        # channel_map = map_lmeta[json_file]
 
-                for k2,v2 in v1.items():
-                    if k2 == "detname":
-                        info_dict["det_id"] = v2
-                    if k2 == "daq":
-                        info_dict[k2] = {
-                            "board_ch": str(v1[k2]["channel"]), # check if it's ok
-                            "board_slot": str(v2["card"]["id"]), # check if it's ok
-                            "board_id": str(v2["card"]["address"]),
-                            "crate": str(v1[k2]["crate"])
-                        }
-                # get the FC channel
-                channel = v1["daq"]["fc_channel"]
-                if channel < 10:
-                    channel = f"ch00{channel}"
-                elif channel > 9 and channel < 100:
-                    channel = f"ch0{channel}"
-                else:
-                    channel = f"ch{channel}"
-                # final dictionary
-                spms_dict[channel] = info_dict
+        # spms_dict = {}
+        # for k1,v1 in channel_map.items():
+        #     if 'S0' in k1: # keep only spms
+        #         info_dict = {}
+        #         info_dict["system"] = "spm"
+        #         info_dict["det_id"] = v1["detname"]
+        #         info_dict["barrel"] = str(v1["location"]["fiber"])[2:]
 
-        # sorting channels in dict
-        spms_keys = list(spms_dict.keys())
-        spms_keys.sort()
-        spms_dict = {i: spms_dict[i] for i in spms_keys}
-        """
+        #         for k2,v2 in v1.items():
+        #             if k2 == "detname":
+        #                 info_dict["det_id"] = v2
+        #             if k2 == "daq":
+        #                 info_dict[k2] = {
+        #                     "board_ch": str(v1[k2]["channel"]), # check if it's ok
+        #                     "board_slot": str(v2["card"]["id"]), # check if it's ok
+        #                     "board_id": str(v2["card"]["address"]),
+        #                     "crate": str(v1[k2]["crate"])
+        #                 }
+        #         # get the FC channel
+        #         channel = v1["daq"]["fc_channel"]
+        #         if channel < 10:
+        #             channel = f"ch00{channel}"
+        #         elif channel > 9 and channel < 100:
+        #             channel = f"ch0{channel}"
+        #         else:
+        #             channel = f"ch{channel}"
+        #         # final dictionary
+        #         spms_dict[channel] = info_dict
+
+        # # sorting channels in dict
+        # spms_keys = list(spms_dict.keys())
+        # spms_keys.sort()
+        # spms_dict = {i: spms_dict[i] for i in spms_keys}
 
     return spms_dict
 
@@ -481,8 +497,10 @@ def read_geds(geds_dict: dict):
         for k, v in geds_dict.items()
         if v["string"]["number"] != "--"
     ]
-    min_str = int(min(str_no))
-    max_str = int(max(str_no))
+
+    unique_list = list(int(a) for a in set(str_no))
+    min_str = min(unique_list)
+    max_str = max(unique_list)
     idx = min_str
 
     # fill lists with strings of channels ('while' loop over no of string)
@@ -500,7 +518,8 @@ def read_geds(geds_dict: dict):
             idx += 1
         else:
             # order channels within a string
-            pos, string = (list(t) for t in zip(*sorted(zip(pos, string))))
+            # print(pos, string)
+            # pos, string = (list(t) for t in zip(*sorted(zip(pos, string))))
             string_tot.append(string)
             string_name.append(f"{idx}")
             idx += 1
@@ -868,6 +887,31 @@ def time_analysis(
     return utime_array, par_array
 
 
+def get_pulser_timestamps(query: str):
+
+    parameters = ["wf_max", "baseline", "timestamp"]
+
+    dbconfig_filename, dlconfig_filename = write_config(
+        files_path, version, [["ch001"]], parameters, "ch001"
+    )
+
+    ch1_data = read_from_dataloader(
+        dbconfig_filename, dlconfig_filename, query, parameters
+    )
+
+    wf_max = ch1_data["wf_max"]
+    baseline = ch1_data["baseline"]
+    timestamps = ch1_data["timestamp"]
+
+    wf_max = np.subtract(wf_max, baseline)
+
+    high_thr = 12500
+
+    above_threshold_ts = timestamps[wf_max > high_thr]
+
+    return above_threshold_ts
+
+
 def get_puls_ievt(query: str):
     """
     Select pulser events.
@@ -878,8 +922,11 @@ def get_puls_ievt(query: str):
             Cut over files
     """
     parameters = ["wf_max", "baseline"]
+    # dbconfig_filename, dlconfig_filename = write_config(
+    #     files_path, version, [["ch000"]], parameters, "ch000"
+    # )
     dbconfig_filename, dlconfig_filename = write_config(
-        files_path, version, [["ch00"]], parameters, "ch00"
+        files_path, version, [["ch001"]], parameters, "ch001"
     )
     ch0_data = read_from_dataloader(
         dbconfig_filename, dlconfig_filename, query, parameters
@@ -893,6 +940,7 @@ def get_puls_ievt(query: str):
     pulser_entry = []
     not_pulser_entry = []
     high_thr = 12500
+    # high_thr = 20000
 
     for idx, entry in enumerate(wf_max):
         puls_ievt.append(idx)
