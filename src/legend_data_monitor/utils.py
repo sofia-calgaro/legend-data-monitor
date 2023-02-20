@@ -1,3 +1,4 @@
+import glob
 import importlib.resources
 import json
 import logging
@@ -49,54 +50,124 @@ for param in SPECIAL_PARAMETERS:
 # -------------------------------------------------------------------------
 
 
-def get_dataloader_timerange(**kwargs):
+def get_query_times(**kwargs):
+    """
+    Get time ranges for DataLoader query from user input, as well as first timestamp for channel map/status query.
+
+    Available kwargs:
+
+    dataset=
+        dict with the following keys:
+            - 'path' [str]: < move description here from get_data() >
+            - 'version' [str]: < move description here from get_data() >
+            - 'type' [str]: < move description here > ! not possible for multiple types now!
+            - the following keys depending in time selection mode (choose one)
+                1) 'start' : <start datetime>, 'end': <end datetime> where <datetime> input is of format 'YYYY-MM-DD hh:mm:ss'
+                2) 'window'[str]: time window in the past from current time point, format: 'Xd Xh Xm' for days, hours, minutes
+                2) 'timestamps': str or list of str in format 'YYYYMMDDThhmmssZ'
+                3) 'runs': int or list of ints for run number(s)  e.g. 10 for r010
+    Or input kwargs separately path=, ...; start=&end=, or window=, or timestamps=, or runs=
+
+    Designed in such a way to accommodate Subsystem init kwargs. A bit cumbersome and can probably be done better.
+
+    Path, version, and type only needed because channel map and status cannot be queried by run directly,
+        so we need these to look up first timestamp in data path to run.
+
+    >>> get_query_times(..., start='2022-09-28 08:00:00', end='2022-09-28 09:30:00')
+    {'timestamp': {'start': '20220928T080000Z', 'end': '20220928T093000Z'}}, '20220928T080000Z'
+
+    >> get_query_times(..., runs=27)
+    ({'run': ['r027']}, '20220928T091135Z')
+    """
+    # get time range query for DataLoader
+    timerange = get_query_timerange(**kwargs)
+
+    first_timestamp = ""
+    # get first timestamp in case keyword is timestamp
+    if "timestamp" in timerange:
+        if "start" in timerange["timestamp"]:
+            first_timestamp = timerange["timestamp"]["start"]
+        else:
+            first_timestamp = min(timerange["timestamp"])
+    # look in path to find first timestamp if keyword is run
+    else:
+        # currently only list of runs and not 'start' and 'end', so always list
+        # find earliest run, format rXXX
+        first_run = min(timerange["run"])
+
+        # --- get dsp filelist of this run
+        # if setup= keyword was used, get dict; otherwise kwargs is already the dict we need
+        path_info = kwargs["dataset"] if "dataset" in kwargs else kwargs
+
+        # format to search /path/to/prod-ref/v06.00/generated/tier/**/phy/**/r027
+        glob_path = os.path.join(
+            path_info["path"],
+            path_info["version"],
+            "generated",
+            "tier",
+            "**",
+            path_info["type"],
+            "**",
+            first_run,
+            "*.lh5",
+        )
+        dsp_files = glob.glob(glob_path)
+        # find earliest
+        dsp_files.sort()
+        first_file = dsp_files[0]
+        # extract timestamp
+        first_timestamp = get_key(first_file)
+
+    return timerange, first_timestamp
+
+
+def get_query_timerange(**kwargs):
     """
     Get DataLoader compatible time range.
 
     Available kwargs:
 
     dataset=
-    dict with the following single field
-        - 'selection' [dict]: dict with fields depending on selection options
-            1) 'start': <start datetime>, 'end': <end datetime> where <datetime> input is of format 'YYYY-MM-DD [hh:mm:ss]' (everything starting from hour is optional)
+        dict with the following keys depending in time selection mode (choose one)
+            1) 'start' : <start datetime>, 'end': <end datetime> where <datetime> input is of format 'YYYY-MM-DD hh:mm:ss'
+            2) 'window'[str]: time window in the past from current time point, format: 'Xd Xh Xm' for days, hours, minutes
             2) 'timestamps': str or list of str in format 'YYYYMMDDThhmmssZ'
-            3) 'runs': int or list of ints for run number(s)
-    Or enter kwargs separately start=&end=, or timestamp=, or runs=
+            3) 'runs': int or list of ints for run number(s)  e.g. 10 for r010
+    Or enter kwargs separately start=&end=, or window=, or timestamp=, or runs=
 
-    >>> get_dataloader_timerange(start='2022-09-28 08:00', end='2022-09-28 09:30')
-    {'start': '20220928T080000Z','end': '20220928093000Z'}
+    Designed in such a way to accommodate Subsystem init kwargs. A bit cumbersome and can probably be done better.
 
-    >>> get_dataloader_timerange(window='1d 5h 0m')
-    {'end': '20230216T182358Z', 'start': '20230215T132358Z'}
+    >>> get_query_timerange(start='2022-09-28 08:00:00', end='2022-09-28 09:30:00')
+    {'timestamp': {'start': '20220928T080000Z', 'end': '20220928T093000Z'}}
 
-    >>> get_dataloader_timerange(timestamps=['20220928T080000Z', '20220928093000Z'])
-    ['20220928T080000Z', '20220928093000Z']
-    >>> get_dataloader_timerange(timestamps='20220928T080000Z')
-    ['20220928T080000Z']
+    >>> get_query_timerange(window='1d 5h 0m')
+    {'timestamp': {'end': '20230220T114337Z', 'start': '20230219T064337Z'}}
 
-    >> get_dataloader_timerange(runs=[9,10])
-    ['r009', 'r010']
-    >>> get_dataloader_timerange(runs=10)
-    ['r010']
+    >>> get_query_timerange(timestamps=['20220928T080000Z', '20220928093000Z'])
+    {'timestamp': ['20220928T080000Z', '20220928093000Z']}
+    >>> get_query_timerange(timestamps='20220928T080000Z')
+    {'timestamp': ['20220928T080000Z']}
 
-    >>> get_dataloader_timerange(dataset={'selection': {'start': '2022-09-28 08:00:00', 'end':'2022-09-28 09:30:00'}})
-    {'start': '20220909T080000Z', 'end': '20220909T093000Z'}
+    >> get_query_timerange(runs=[9,10])
+    {'run': ['r009', 'r010']}
+    >>> get_query_timerange(runs=10)
+    {'run': ['r010']}
+
+    >>> get_query_timerange(dataset={'start': '2022-09-28 08:00:00', 'end':'2022-09-28 09:30:00'})
+    {'timestamp': {'start': '20220928T080000Z', 'end': '20220928T093000Z'}}
     """
     # if dataset= kwarg was provided, get the 'selection' part
     # otherwise kwargs itself is already the dict we need with start= & end=; or timestamp= etc
-    user_selection = kwargs["dataset"]["selection"] if "dataset" in kwargs else kwargs
-
-    message = "Time selection mode: "
+    user_selection = kwargs["dataset"] if "dataset" in kwargs else kwargs
 
     # -------------------------------------------------------------------------
     #  in these cases, DataLoader will be called with (timestamp >= ...) and (timestamp <= ...)
     # -------------------------------------------------------------------------
     if "start" in user_selection:
-        message += "time range"
-        time_range = {}
+        time_range = {"timestamp": {}}
         for point in ["start", "end"]:
             try:
-                time_range[point] = datetime.strptime(
+                time_range["timestamp"][point] = datetime.strptime(
                     user_selection[point], "%Y-%m-%d %H:%M:%S"
                 ).strftime("%Y%m%dT%H%M%SZ")
             except ValueError:
@@ -104,9 +175,8 @@ def get_dataloader_timerange(**kwargs):
                 return
 
     elif "window" in user_selection:
-        message += "time window"
-        time_range = {}
-        time_range["end"] = datetime.now().strftime("%Y%m%dT%H%M%SZ")
+        time_range = {"timestamp": {}}
+        time_range["timestamp"]["end"] = datetime.now().strftime("%Y%m%dT%H%M%SZ")
         try:
             days, hours, minutes = re.split(r"d|h|m", user_selection["window"])[
                 :-1
@@ -116,15 +186,16 @@ def get_dataloader_timerange(**kwargs):
             return
 
         dt = timedelta(days=int(days), hours=int(hours), minutes=int(minutes))
-        time_range["start"] = (
-            datetime.strptime(time_range["end"], "%Y%m%dT%H%M%SZ") - dt
+        time_range["timestamp"]["start"] = (
+            datetime.strptime(time_range["timestamp"]["end"], "%Y%m%dT%H%M%SZ") - dt
         ).strftime("%Y%m%dT%H%M%SZ")
 
     # -------------------------------------------------------------------------
-    #  in these cases, DataLoader will be called with (timestamp/run = ...) or (timestamp/run= ...)
+    #  in these cases, DataLoader will be called with (timestamp/run == ...) or (timestamp/run == ...)
     # -------------------------------------------------------------------------
     elif "timestamps" in user_selection:
-        time_range = (
+        time_range = {"timestamp": []}
+        time_range["timestamp"] = (
             user_selection["timestamps"]
             if isinstance(user_selection["timestamps"], list)
             else [user_selection["timestamps"]]
@@ -143,7 +214,8 @@ def get_dataloader_timerange(**kwargs):
                 return
 
         # format rXXX for DataLoader
-        time_range = ["r" + str(run).zfill(3) for run in runs]
+        time_range = {"run": []}
+        time_range["run"] = ["r" + str(run).zfill(3) for run in runs]
 
     else:
         logger.error("Invalid time selection!")
@@ -261,3 +333,8 @@ def get_all_plot_parameters(subsystem: str, config: dict):
                 all_parameters += parameters
 
     return all_parameters
+
+
+def get_key(dsp_fname: str) -> str:
+    """Extract key from lh5 filename."""
+    return re.search(r"-\d{8}T\d{6}Z", dsp_fname).group(0)[1:]

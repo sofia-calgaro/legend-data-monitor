@@ -48,10 +48,14 @@ def control_plots(user_config_path: str):
         utils.logger.error(subsystem.Subsystem.get_data.__doc__)
         return
 
-    user_time_range = utils.get_dataloader_timerange(dataset=config["dataset"])
+    # dict of format {'timestamp/run': <timerange> } where <timerange> is either a dict {'start': ..., or 'end': ...}, or a list
+    user_time_range = utils.get_query_timerange(dataset=config["dataset"])
     # will be returned as None if something is wrong, and print an error message
     if not user_time_range:
         return
+
+    # we don't care here about the time keyword timestamp/run -> just get the value
+    user_time_range = list(user_time_range.values())[0]
 
     name_time = (
         [user_time_range["start"], user_time_range["end"]]
@@ -70,12 +74,12 @@ def control_plots(user_config_path: str):
     # -------------------------------------------------------------------------
 
     # put it in a dict, so that later, if pulser is also wanted to be plotted, we don't have to load it twice
-    subsystems = {"pulser": subsystem.Subsystem("pulser", setup=config["dataset"])}
+    subsystems = {"pulser": subsystem.Subsystem("pulser", dataset=config["dataset"])}
     # get list of all parameters needed for all requested plots, if any
     parameters = utils.get_all_plot_parameters("pulser", config)
     # get data for these parameters and time range given in the dataset
     # (if no parameters given to plot, baseline and wfmax will always be loaded to flag pulser events anyway)
-    subsystems["pulser"].get_data(parameters, dataset=config["dataset"])
+    subsystems["pulser"].get_data(parameters)
     utils.logger.debug(subsystems["pulser"].data)
 
     # -------------------------------------------------------------------------
@@ -91,11 +95,11 @@ def control_plots(user_config_path: str):
         # set up if wasn't already set up (meaning, not pulser, previously already set up)
         if system not in subsystems:
             # Subsystem: knows its channel map & software status (On/Off channels)
-            subsystems[system] = subsystem.Subsystem(system, setup=config["dataset"])
+            subsystems[system] = subsystem.Subsystem(system, dataset=config["dataset"])
             # get list of parameters needed for all requested plots, if any
             parameters = utils.get_all_plot_parameters(system, config)
             # get data for these parameters and dataset range
-            subsystems[system].get_data(parameters, dataset=config["dataset"])
+            subsystems[system].get_data(parameters)
             utils.logger.debug(subsystems[system].data)
             # flag pulser events for future parameter data selection
             subsystems[system].flag_pulser_events(subsystems["pulser"])
@@ -109,7 +113,7 @@ def control_plots(user_config_path: str):
 
         # - set up log file
         # file handler
-        file_handler = utils.logging.FileHandler(pdf_basepath + system + ".log")
+        file_handler = utils.logging.FileHandler(pdf_basepath + "_" + system + ".log")
         file_handler.setLevel(utils.logging.DEBUG)
         # add to logger
         utils.logger.addHandler(file_handler)
