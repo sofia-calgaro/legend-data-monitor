@@ -350,6 +350,7 @@ class Subsystem:
         # config.channel_map is already a dict read from the channel map json
         for entry in full_channel_map:
             # skip 'BF' don't even know what it is
+            # ! not needed since BF is auxs
             if "BF" in entry:
                 continue
 

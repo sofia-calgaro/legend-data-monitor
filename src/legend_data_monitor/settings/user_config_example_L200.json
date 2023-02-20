@@ -1,43 +1,41 @@
 {
-  "output": "/data1/users/redchuk/data_monitor/dm_out",
-  "dataset": {
-    "experiment": "L200",
-    "period": "p02",
-    "version": "v06.00",
-    "path": "/data1/users/marshall/prod-ref",
-    "type": "phy",
-    "selection": {
-      "start": "2023-01-26 04:30:00",
-      "end": "2023-01-26 07:00:00"
-    }
-  },
-  "subsystems": {
-    "pulser": {
-      "Pulser event rate": {
-        "parameters": "event_rate",
-        "event_type": "pulser",
-        "plot_structure": "per channel",
-        "plot_style": "vs time",
-        "variation": false,
-        "time_window": "1H"
-      },
-      "AUX channel waveform maximum": {
-        "parameters": "wf_max",
-        "event_type": "all",
-        "plot_structure": "per channel",
-        "plot_style": "histogram",
-        "variation": false
-      }
+    "output": "/data1/users/redchuk/data_monitor/dm_out",
+    "dataset": {
+        "experiment": "L200",
+        "period": "p02",
+        "version": "v06.00",
+        "path": "/data1/users/marshall/prod-ref",
+        "type": "phy",
+        "start": "2023-01-26 04:30:00",
+        "end": "2023-01-26 07:00:00"
     },
-    "geds": {
-      "Baselines in pulser events": {
-        "parameters": "baseline",
-        "event_type": "pulser",
-        "plot_structure": "per channel",
-        "plot_style": "vs time",
-        "variation": true,
-        "time_window": "1H"
-      }
+    "subsystems": {
+        "pulser": {
+            "Pulser event rate": {
+                "parameters": "event_rate",
+                "event_type": "pulser",
+                "plot_structure": "per channel",
+                "plot_style": "vs time",
+                "variation": false,
+                "time_window": "1H"
+            },
+            "AUX channel waveform maximum": {
+                "parameters": "wf_max",
+                "event_type": "all",
+                "plot_structure": "per channel",
+                "plot_style": "histogram",
+                "variation": false
+            }
+        },        
+        "geds": {
+            "Baselines in pulser events":{
+                "parameters": "baseline",
+                "event_type": "pulser",
+                "plot_structure": "per channel",
+                "plot_style" : "vs time",
+                "variation": true,
+                "time_window": "1H"
+            }
+        }
     }
-  }
 }
