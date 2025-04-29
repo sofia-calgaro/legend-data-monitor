@@ -135,9 +135,9 @@ class SlowControl:
                 self.scdb,
             )
         else:
-            lower_lim = (
-                upper_lim
-            ) = None  # there are just 'set values', no actual thresholds
+            lower_lim = upper_lim = (
+                None  # there are just 'set values', no actual thresholds
+            )
             if "vmon" in self.parameter:
                 unit = "V"
             elif "imon" in self.parameter:
@@ -151,9 +151,11 @@ class SlowControl:
         get_table_df["upper_lim"] = upper_lim
 
         # fix time column
-        get_table_df['tstamp'] = pd.to_datetime(get_table_df['tstamp'], utc=True)
+        get_table_df["tstamp"] = pd.to_datetime(get_table_df["tstamp"], utc=True)
         # fix value column
-        get_table_df['value'] = pd.to_numeric(get_table_df['value'], errors='coerce')  # handle errors as NaN
+        get_table_df["value"] = pd.to_numeric(
+            get_table_df["value"], errors="coerce"
+        )  # handle errors as NaN
 
         # remove unnecessary columns
         remove_cols = ["rack", "group", "sensor", "name", "almask"]

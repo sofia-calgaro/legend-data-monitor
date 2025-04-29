@@ -94,9 +94,11 @@ def build_out_dict(
             ) or isinstance(plot_settings["parameters"], str):
                 utils.logger.debug("... appending new data for the one-parameter case")
                 out_dict = append_new_data(
-                    plot_settings["parameters"][0]
-                    if isinstance(plot_settings["parameters"], list)
-                    else plot_settings["parameters"],
+                    (
+                        plot_settings["parameters"][0]
+                        if isinstance(plot_settings["parameters"], list)
+                        else plot_settings["parameters"]
+                    ),
                     plot_settings,
                     plot_info,
                     old_dict,

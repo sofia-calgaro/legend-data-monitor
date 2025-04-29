@@ -6,4 +6,5 @@ User Manual
 
    avail_pars
    get_plots
+   get_sc_plots
    inspect_plots

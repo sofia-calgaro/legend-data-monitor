@@ -7,9 +7,9 @@ After the installation, a executable is available at ``~/.local/bin``.
 To automatically generate plots, two different methods are available.
 All methods rely on the existence of a config file containing the output folder (``output``)
 where to store results, the ``dataset`` you want to inspect, and the ``subsystems`` (pulser, geds, spms)
-you want to study and for which you want to load data.
+you want to study and for which you want to load data. See next section for more details.
 
-You can either run it by importing the ``legend-data-monitor`` module:
+You can either run the code by importing the ``legend-data-monitor`` module:
 
 .. code-block:: python
 
@@ -23,11 +23,21 @@ Or run it by parsing to the executable the path to the config file:
 
   $ legend-data-monitor user_prod --config path_to_config.json
 
+If you want to inspect bunches of data (useful to avoid the process to get killed
+when loading lots of heavy files), you can use
+
+.. code-block:: bash
+
+  $ legend-data-monitor user_bunch --config path_to_config.json --n_files N
+
+where ``N`` specifies how many files you want to inspect together at each iteration e.g. ``N=40``
+(one run is usually made up of ca. 160 files).
+
+
 .. warning::
 
   Use the ``user_prod`` command line interface for generating your own plots.
-  ``auto_prod`` was designed to be used during automatic data production, for generating monitoring plots on the fly when processing data. For the moment, no documentation will be provided.
-  ``user_rsync_prod`` was designed to be used by an user for a personal automatic plot generation, using rsync to synchronize with lh5 files automatically produced.
+  ``auto_prod`` and ``user_rsync_prod`` were designed to be used during automatic data production, for generating monitoring plots on the fly for new processed data. For the moment, no documentation will be provided.
 
 
 Configuration file
@@ -40,12 +50,12 @@ Example config
 .. code-block:: json
 
  {
-  "output": "<some_path>/out", // output folder
+  "output": "<output_path>", // output folder
   "dataset": {
     "experiment": "L200",
-    "period": "p02",
-    "version": "v06.00",
-    "path": "/data1/users/marshall/prod-ref",
+    "period": "p09",
+    "version": "tmp-auto",
+    "path": "/data2/public/prodenv/prod-blind/",
     "type": "phy",// data type (either cal, phy, or ["cal", "phy"])
     "start": "2023-02-07 02:00:00",  // time cut (here based on start+end)
     "end": "2023-02-07 03:30:00"
@@ -86,16 +96,8 @@ In particular, ``dataset`` settings are:
   - ``'window': '1d 2h 0m'`` ( time window in the past from current time point) in format ``Xd Xh Xm`` for days, hours, minutes;
   - ``'runs': 1`` (one run) or ``'runs': [1, 2, 3]`` (list of runs) in integer format.
 
-..
-  Note: currently taking range between earliest and latest i.e. also including the ones in between that are not listed, will be modified to either
 
-  1. require only two timestamps as start and end, or
-  2. get only specified timestamps (strange though, because would have gaps in the plot)
-
-  The same happens with run selection.
-
-
-Then, ``subsystems`` can either be ``pulser``, ``geds`` or ``spms`` (note, 2023-03-07: spms plots are not implemented yet, but DataLoader can load the respective data if needed).
+Then, ``subsystems`` can either be ``pulser``, ``geds`` or ``spms`` (note: spms plots are not implemented yet, but DataLoader can load the respective data if needed).
 
 For each subsystem to be plotted, specify
 

@@ -7,49 +7,84 @@ How to load SC data
 A number of parameters related to the LEGEND hardware configuration and status are recorded in the Slow Control (SC) database.
 The latter, PostgreSQL database resides on the ``legend-sc.lngs.infn.it`` host, part of the LNGS network.
 To access the SC database, follow the `Confluence (Python Software Stack) <https://legend-exp.atlassian.net/wiki/spaces/LEGEND/pages/494764033/Python+Software+Stack>`_ instructions.
-Data are loaded following the ``pylegendmeta`` tutorial , which shows how to inspect the database.
+Data are loaded following the `pylegendmeta <https://github.com/legend-exp/pylegendmeta>`_ tutorial, which shows how to retrieve info from the SC database.
 
 
-... put here some text on how to specify the plotting of a SC parameter in the config file (no ideas for the moment)...
+Available SC parameters
+-----------------------
 
+Available parameters at the moment include:
 
-Files are collected in the output folder specified in the ``output`` config entry:
+* ``PT114``, ``PT115``, ``PT118`` (cryostat pressures)
+* ``PT202``, ``PT205``, ``PT208`` (cryostat vacuum)
+* ``LT01`` (water loop fine fill level)
+* ``RREiT`` (injected air temperature clean room), ``RRNTe`` (clean room temperature north), ``RRSTe`` (clean room temperature south), ``ZUL_T_RR`` (supply air temperature clean room)
+* ``DaqLeft-Temp1``, ``DaqLeft-Temp2``, ``DaqRight-Temp1``, ``DaqRight-Temp2`` (rack present temperatures)
+* if you want more, contact us!
+
+These can be easily access for any time range of interest by giving a my_config.json file as input to the command line in the following way:
+
+.. code-block::
+
+  legend-data-monitor user_scdb --config my_config --port N --pswd ThePassword
+
+.. note::
+
+  - ``N`` is whatever number in the range 1024-65535. Setting a personal port different from the default one (5432) is a safer option, otherwise if a port is already in use by another user, you'll receive an error indicating that the port is already taken and you will not be able to access the SC database;
+  - ``ThePassword`` can be found on Confluence at `this page <https://legend-exp.atlassian.net/wiki/spaces/LEGEND/pages/494764033/Python+Software+Stack#Metadata-access>`_.
+
+An example of a config.json file is the following:
 
 .. code-block:: json
 
   {
-  "output": "<some_path>/out",
-  // ...
+  "output": "/data1/users/<your_username>/prod-ref-v2",
+  "dataset": {
+    "experiment": "L200",
+    "period": "p09",
+    "version": "tmp-auto",
+    "path": "/data2/public/prodenv/prod-blind/",
+    "type": "phy",
+    "time_selection": ...
+    },
+  "saving": "overwrite",
+  "slow_control": {
+    "parameters": ["DaqLeft-Temp1", "ZUL_T_RR"]
+    }
+  }
 
-In principle, for plotting the SC data you would need just the start and the end of a time interval of interest. This means that SC data does not depend on any dataset info (``experiment``, ``period``, ``version``, ``type``) but ``time_selection``.
-However, there are cases were we want to inspect a given run or time period made of keys as we usually do with germanium.
+The meaning of each entry is explained below:
 
-In the first case, we end up saving data in the following folder:
+* ``output``: foldeer where to store output files;
+* ``dataset``:
+
+    * ``experiment``: either *L60* (to be checked) or *L200*
+    * ``period``: period to inspect
+    * ``version``: prodenv version (eg *tmp-auto* or *ref-v1.0.0*)
+    * ``path``: global path to prod-blind prodenv folder
+    * ``type``: type of data to inspect (either *cal* or *phy*)
+    *  ``time selection``: list of either ``runs`` or ``timestamps`` (use the format *YMDTHMSZ*), or add entries ``start`` and ``end`` with format *Y-M-D H:M:S* (see below for more detailed info)
+
+* ``saving``: either *overwrite* (overwrites any already present file) or *append* (takes the previous file and append new data, eg for a new inspected time range)
+* ``slow_control``: filed for specifying SC parameters
+
+    * ``parameters``: list of parameters to inspect (see among the available ones what you can choose)
+
+
+In principle, for plotting the SC data you would need just the start and the end of a time interval of interest. This means that SC data does not depend on any dataset info (i.e. on entries ``experiment``, ``period``, ``version``, ``type``).
+However, these entries are important to retrieve any channel map of interest for the given time range of interest.
+
+We store SC data in the following way:
 
 .. code-block::
 
-  <some_path>/out/
-    └── generated
-      └── plt
-        └── SC
-          └── <time_selection>
-            ├── SC-<time_selection>.pdf
-            ├── SC-<time_selection>.log
-            └── SC-<time_selection>.{dat,bak,dir}
-
-Otherwise, we store the SC data/plots as usual:
-
-.. code-block::
-
-  <some_path>/out/
+  <output>
     └── generated
       └── plt
         └── <type>
           └── <period>
-            └── SC
               └── <time_selection>
-                ├── SC-<time_selection>.pdf
-                ├── SC-<time_selection>.log
+                ├── SC-<time_selection>.hdf
                 └── SC-<time_selection>.{dat,bak,dir}
 
 
@@ -62,19 +97,3 @@ Otherwise, we store the SC data/plots as usual:
   - if ``{'timestamps': ['20230207T103123Z', '20230207T141123Z', '20230207T083323Z']}`` (multiple keys), then <time_selection> = ``20230207T083323Z_20230207T141123Z`` (min/max timestamp interval)
   - if ``{'runs': 1}`` (one run), then <time_selection> = ``r001``;
   - if ``{'runs': [1, 2, 3]}`` (multiple runs), then <time_selection> = ``r001_r002_r003``.
-
-Shelve output objects
-~~~~~~~~~~~~~~~~~~~~~
-*Under construction...*
-
-
-Available SC parameters
------------------------
-
-Available parameters include:
-
-- ``PT114``, ``PT115``, ``PT118`` (cryostat pressures)
-- ``PT202``, ``PT205``, ``PT208`` (cryostat vacuum)
-- ``LT01`` (water loop fine fill level)
-- ``RREiT`` (injected air temperature clean room), ``RRNTe`` (clean room temperature north), ``RRSTe`` (clean room temperature south), ``ZUL_T_RR`` (supply air temperature clean room)
-- ``DaqLeft-Temp1``, ``DaqLeft-Temp2``, ``DaqRight-Temp1``, ``DaqRight-Temp2`` (rack present temperatures)

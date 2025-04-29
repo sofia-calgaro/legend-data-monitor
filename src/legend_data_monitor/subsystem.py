@@ -186,12 +186,12 @@ class Subsystem:
         now = datetime.now()
         self.data = dl.load()
         utils.logger.info(f"Total time to load data: {(datetime.now() - now)}")
-        
+
         # -------------------------------------------------------------------------
         # polish things up
         # -------------------------------------------------------------------------
 
-        tier = "dsp" 
+        tier = "dsp"
         if "hit" in dbconfig["columns"]:
             tier = "hit"
         if self.partition and "pht" in dbconfig["columns"]:
@@ -370,7 +370,7 @@ class Subsystem:
 
         else:
             # --- if no object was provided, it's understood that this itself is a pulser
-            trapTmax = self.data["trapTmax"] 
+            trapTmax = self.data["trapTmax"]
             pulser_timestamps = self.data[trapTmax > 200].index
             # flag them
             self.data["flag_pulser"] = False
@@ -494,10 +494,10 @@ class Subsystem:
         # -------------------------------------------------------------------------
 
         # for L60-p01 and L200-p02, keep using 'fcid' as channel
-        if int(self.period.split('p')[-1]) < 3:
+        if int(self.period.split("p")[-1]) < 3:
             ch_flag = "fcid"
         # from L200-p03 included, uses 'rawid' as channel
-        if int(self.period.split('p')[-1]) >= 3:
+        if int(self.period.split("p")[-1]) >= 3:
             ch_flag = "rawid"
 
         # dct_key is the subdict corresponding to one chmap entry
@@ -679,7 +679,7 @@ class Subsystem:
             if channel_name in self.channel_map.index:
                 self.channel_map.at[channel_name, "status"] = full_status_map[
                     channel_name
-                ]["usability"] 
+                ]["usability"]
 
         # -------------------------------------------------------------------------
         # quick-fix to remove detectors while status maps are not updated
@@ -727,7 +727,6 @@ class Subsystem:
         # some parameters might be repeated twice - remove
         return list(np.unique(params))
 
-
     def construct_dataloader_configs(self, params: list_of_str):
         """
         Construct DL and DB configs for DataLoader based on parameters and which tiers they belong to.
@@ -744,7 +743,7 @@ class Subsystem:
         # ...
         param_tiers = pd.DataFrame.from_dict(utils.PARAMETER_TIERS.items())
         param_tiers.columns = ["param", "tier"]
-        # change from 'hit' to 'pht' when loading data for partitioned files 
+        # change from 'hit' to 'pht' when loading data for partitioned files
         if self.partition:
             param_tiers["tier"] = param_tiers["tier"].replace("hit", "pht")
             param_tiers["tier"] = param_tiers["tier"].replace("dsp", "psp")
@@ -774,26 +773,24 @@ class Subsystem:
         # set up tiers depending on what parameters we need
         # -------------------------------------------------------------------------
 
-        # only load channels that are on or ac 
-        chlist = list(self.channel_map[(self.channel_map["status"] == "on") | (self.channel_map["status"] == "ac")]["channel"])
+        # only load channels that are on or ac
+        chlist = list(
+            self.channel_map[
+                (self.channel_map["status"] == "on")
+                | (self.channel_map["status"] == "ac")
+            ]["channel"]
+        )
         # remove off channels
         removed_chs = list(
             self.channel_map[self.channel_map["status"] == "off"]["name"]
         )
         utils.logger.info(f"...... not loading channels with status off: {removed_chs}")
-        """
-        # remove on channels that are not processable (ie have no hit entries)
-        removed_unprocessable_chs = list(
-            self.channel_map[self.channel_map["status"] == "on_not_process"]["name"]
-        )
-        utils.logger.info(f"...... not loading on channels that are not processable: {removed_unprocessable_chs}")
-        """
 
         # for L60-p01 and L200-p02, keep using 3 digits
-        if int(self.period.split('p')[-1]) < 3:
+        if int(self.period.split("p")[-1]) < 3:
             ch_format = "ch:03d"
         # from L200-p03 included, uses 7 digits
-        if int(self.period.split('p')[-1]) >= 3:
+        if int(self.period.split("p")[-1]) >= 3:
             ch_format = "ch:07d"
 
         # --- settings for each tier
@@ -838,7 +835,6 @@ class Subsystem:
 
         return dict_dlconfig, dict_dbconfig
 
-
     def remove_timestamps(self, remove_keys: dict):
         """Remove timestamps from the dataframes for a given channel.
 
@@ -872,13 +868,13 @@ class Subsystem:
         self.data = self.data.reset_index()
 
     def below_period_3_excluded(self) -> bool:
-        if int(self.period.split('p')[-1]) < 3:
+        if int(self.period.split("p")[-1]) < 3:
             return True
         else:
             return False
 
     def above_period_3_included(self) -> bool:
-        if int(self.period.split('p')[-1]) >= 3:
+        if int(self.period.split("p")[-1]) >= 3:
             return True
         else:
             return False

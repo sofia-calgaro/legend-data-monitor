@@ -6,7 +6,7 @@ In particular, this tool helps:
 
 * set up dataframe objects containing channel map and status for a given subsystems (pulser, geds, spms)
 * get data for parameters (from raw/dsp/hit tiers or user defined ones) of interest based on a given dataset
-* inspect parameters by providing either a time interval, runs or keys to inspect
+* inspect parameters by providing either a time interval, a list of run(s) or key(s) to inspect
 * plotting status maps (e.g., ON/OFF/...) for each channel, spotting those that are problematic when overcoming/undercoming given thresholds
 
 Getting started
